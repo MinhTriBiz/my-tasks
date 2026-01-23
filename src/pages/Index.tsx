@@ -5,14 +5,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { AddTodoForm } from "@/components/AddTodoForm";
 import { TodoItem } from "@/components/TodoItem";
 import { FilterTabs } from "@/components/FilterTabs";
+import { ProfileSettings } from "@/components/ProfileSettings";
 import { Button } from "@/components/ui/button";
 import { useTodos } from "@/hooks/useTodos";
+import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
 
 const Index = () => {
   const navigate = useNavigate();
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const { todos, filter, setFilter, addTodo, toggleTodo, deleteTodo, counts, isLoading } = useTodos();
+  const { todos, filter, setFilter, addTodo, updateTodo, toggleTodo, deleteTodo, counts, isLoading } = useTodos();
+  const { profile } = useProfile();
 
   useEffect(() => {
     // Check authentication
@@ -69,21 +72,24 @@ const Index = () => {
                 My Tasks
               </h1>
             </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleLogout}
-              className="gap-2"
-            >
-              <LogOut className="h-4 w-4" />
-              Đăng xuất
-            </Button>
+            <div className="flex items-center gap-2">
+              <ProfileSettings />
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleLogout}
+                className="gap-2"
+              >
+                <LogOut className="h-4 w-4" />
+                Đăng xuất
+              </Button>
+            </div>
           </div>
           <div className="text-center">
             <p className="text-muted-foreground">
-              Stay organized and productive
+              {profile?.username ? `Xin chào, ${profile.username}!` : "Quản lý công việc hiệu quả"}
             </p>
-            {userEmail && (
+            {userEmail && !profile?.username && (
               <p className="text-sm text-muted-foreground mt-1">
                 {userEmail}
               </p>
@@ -114,15 +120,15 @@ const Index = () => {
               </div>
               <h3 className="text-lg font-medium text-foreground mb-2">
                 {filter === "completed" 
-                  ? "No completed tasks yet"
+                  ? "Chưa có task hoàn thành"
                   : filter === "active"
-                  ? "No active tasks"
-                  : "No tasks yet"}
+                  ? "Không có task đang làm"
+                  : "Chưa có task nào"}
               </h3>
               <p className="text-muted-foreground">
-                {filter === "all" && "Add your first task to get started!"}
-                {filter === "active" && "All tasks are completed. Great job!"}
-                {filter === "completed" && "Complete some tasks to see them here."}
+                {filter === "all" && "Thêm task đầu tiên để bắt đầu!"}
+                {filter === "active" && "Tất cả task đã hoàn thành. Tuyệt vời!"}
+                {filter === "completed" && "Hoàn thành một số task để xem ở đây."}
               </p>
             </div>
           ) : (
@@ -132,6 +138,7 @@ const Index = () => {
                 todo={todo}
                 onToggle={toggleTodo}
                 onDelete={deleteTodo}
+                onUpdate={updateTodo}
               />
             ))
           )}
@@ -142,7 +149,7 @@ const Index = () => {
           <div className="mt-8 text-center text-sm text-muted-foreground">
             {counts.completed > 0 && (
               <p>
-                You've completed {counts.completed} out of {counts.all} tasks! Keep it up! 🎉
+                Bạn đã hoàn thành {counts.completed}/{counts.all} tasks! Tiếp tục phát huy! 🎉
               </p>
             )}
           </div>
