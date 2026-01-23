@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Todo, FilterType } from "@/types/todo";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,25 +18,46 @@ export const useTodos = () => {
         .order("created_at", { ascending: false });
 
       if (error) {
-        toast.error("Failed to load tasks");
+        toast.error("Không thể tải danh sách tasks");
         throw error;
       }
 
       return data.map((todo) => ({
-        ...todo,
+        id: todo.id,
+        title: todo.title,
+        description: todo.description || undefined,
+        completed: todo.completed,
         createdAt: new Date(todo.created_at),
         completedAt: todo.completed_at ? new Date(todo.completed_at) : undefined,
-      }));
+        dueDate: todo.due_date ? new Date(todo.due_date) : undefined,
+        location: todo.location || undefined,
+        reminderAt: todo.reminder_at ? new Date(todo.reminder_at) : undefined,
+        reminderEnabled: todo.reminder_enabled,
+      })) as Todo[];
     },
   });
 
   // Add todo mutation
   const addTodoMutation = useMutation({
-    mutationFn: async ({ title, description }: { title: string; description?: string }) => {
+    mutationFn: async ({ 
+      title, 
+      description, 
+      dueDate, 
+      location, 
+      reminderAt, 
+      reminderEnabled 
+    }: { 
+      title: string; 
+      description?: string;
+      dueDate?: Date;
+      location?: string;
+      reminderAt?: Date;
+      reminderEnabled?: boolean;
+    }) => {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        throw new Error("User not authenticated");
+        throw new Error("Bạn chưa đăng nhập");
       }
 
       const { data, error } = await supabase
@@ -45,6 +66,10 @@ export const useTodos = () => {
           title,
           description,
           user_id: user.id,
+          due_date: dueDate?.toISOString(),
+          location,
+          reminder_at: reminderAt?.toISOString(),
+          reminder_enabled: reminderEnabled || false,
         })
         .select()
         .single();
@@ -54,22 +79,83 @@ export const useTodos = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["todos"] });
-      toast.success("Task added successfully!");
+      toast.success("Đã thêm task mới!");
     },
     onError: (error: any) => {
-      toast.error(error.message || "Failed to add task");
+      toast.error(error.message || "Không thể thêm task");
     },
   });
 
-  const addTodo = (title: string, description?: string) => {
-    addTodoMutation.mutate({ title, description });
+  const addTodo = (
+    title: string, 
+    description?: string,
+    dueDate?: Date,
+    location?: string,
+    reminderAt?: Date,
+    reminderEnabled?: boolean
+  ) => {
+    addTodoMutation.mutate({ title, description, dueDate, location, reminderAt, reminderEnabled });
+  };
+
+  // Update todo mutation
+  const updateTodoMutation = useMutation({
+    mutationFn: async ({ 
+      id,
+      title, 
+      description, 
+      dueDate, 
+      location, 
+      reminderAt, 
+      reminderEnabled 
+    }: { 
+      id: string;
+      title: string; 
+      description?: string;
+      dueDate?: Date;
+      location?: string;
+      reminderAt?: Date;
+      reminderEnabled?: boolean;
+    }) => {
+      const { error } = await supabase
+        .from("todos")
+        .update({
+          title,
+          description,
+          due_date: dueDate?.toISOString() || null,
+          location: location || null,
+          reminder_at: reminderAt?.toISOString() || null,
+          reminder_enabled: reminderEnabled || false,
+        })
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["todos"] });
+      toast.success("Đã cập nhật task!");
+    },
+    onError: () => {
+      toast.error("Không thể cập nhật task");
+    },
+  });
+
+  const updateTodo = (
+    id: string,
+    title: string, 
+    description?: string,
+    dueDate?: Date,
+    location?: string,
+    reminderAt?: Date,
+    reminderEnabled?: boolean
+  ) => {
+    updateTodoMutation.mutate({ id, title, description, dueDate, location, reminderAt, reminderEnabled });
   };
 
   // Toggle todo mutation
   const toggleTodoMutation = useMutation({
     mutationFn: async (id: string) => {
       const todo = todos.find((t) => t.id === id);
-      if (!todo) throw new Error("Todo not found");
+      if (!todo) throw new Error("Không tìm thấy task");
 
       const { error } = await supabase
         .from("todos")
@@ -82,7 +168,7 @@ export const useTodos = () => {
       queryClient.invalidateQueries({ queryKey: ["todos"] });
     },
     onError: () => {
-      toast.error("Failed to update task");
+      toast.error("Không thể cập nhật task");
     },
   });
 
@@ -102,10 +188,10 @@ export const useTodos = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["todos"] });
-      toast.success("Task deleted");
+      toast.success("Đã xóa task");
     },
     onError: () => {
-      toast.error("Failed to delete task");
+      toast.error("Không thể xóa task");
     },
   });
 
@@ -130,6 +216,7 @@ export const useTodos = () => {
     filter,
     setFilter,
     addTodo,
+    updateTodo,
     toggleTodo,
     deleteTodo,
     counts,
